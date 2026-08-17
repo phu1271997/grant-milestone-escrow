@@ -1,4 +1,11 @@
 import { createClient } from 'genlayer-js';
+import {
+  ExecutionResult,
+  TransactionStatus,
+  type CalldataEncodable,
+  type GenLayerTransaction,
+  type Hash,
+} from 'genlayer-js/types';
 import { chain, escrowAddress, policyAddress, reputationAddress } from './config';
 import { connectWallet, ensureNetwork, getProvider } from './wallet';
 import type {
@@ -35,7 +42,7 @@ function requireAddress(state: typeof escrowAddress, name: string): `0x${string}
 async function readJson<T>(
   address: `0x${string}`,
   functionName: string,
-  args: unknown[] = [],
+  args: CalldataEncodable[] = [],
 ): Promise<T> {
   const raw = await readClient.readContract({ address, functionName, args });
   if (typeof raw === 'string') return JSON.parse(raw) as T;
@@ -109,9 +116,31 @@ export interface WriteProgress {
 
 interface WriteOptions {
   functionName: string;
-  args: unknown[];
+  args: CalldataEncodable[];
   value?: bigint;
   onProgress?: (progress: WriteProgress) => void;
+}
+
+/**
+ * Finality is not success.
+ *
+ * A transaction can finalize having reverted inside the GenVM, and a naive
+ * client reports that as "done" while the state never changed. The receipt is
+ * checked for an actual return before this app claims anything happened.
+ */
+function assertExecuted(receipt: GenLayerTransaction): void {
+  const execution = receipt.txExecutionResultName;
+  if (execution === ExecutionResult.FINISHED_WITH_ERROR) {
+    const leader = receipt.consensus_data?.leader_receipt?.[0] as
+      | { result?: unknown; error?: unknown }
+      | undefined;
+    const detail =
+      typeof leader?.error === 'string' ? `: ${leader.error}` : '';
+    throw new Error(`The transaction finalized but reverted inside the contract${detail}`);
+  }
+  if (execution !== undefined && execution !== ExecutionResult.FINISHED_WITH_RETURN) {
+    throw new Error(`The transaction finalized with an unexpected result: ${execution}`);
+  }
 }
 
 /**
@@ -142,12 +171,17 @@ export async function write({
     functionName,
     args,
     value: value ?? 0n,
-  })) as `0x${string}`;
+  })) as Hash;
 
   onProgress?.({ phase: 'submitted', hash });
   onProgress?.({ phase: 'awaiting-consensus', hash });
 
-  await client.waitForTransactionReceipt({ hash, status: 'FINALIZED' });
+  const receipt = (await client.waitForTransactionReceipt({
+    hash,
+    status: TransactionStatus.FINALIZED,
+  })) as GenLayerTransaction;
+
+  assertExecuted(receipt);
   onProgress?.({ phase: 'finalized', hash });
   return hash;
 }
