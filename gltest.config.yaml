@@ -1,0 +1,37 @@
+# Configuration for the on-chain suite in tests_onchain/.
+#
+# The offline suite in tests/ does not use this file at all — it runs the same
+# contract source against an in-process shim and needs no network. Run the
+# on-chain suite explicitly:
+#
+#   gltest --network studionet tests_onchain/
+#
+# Accounts are deliberately not listed here. Supply a funded Studionet key
+# through the environment file below, which is git-ignored and must stay that
+# way. A private key committed to a repository is a private key you have given
+# away, regardless of what it is worth today.
+
+networks:
+  default: studionet
+
+  studionet:
+    id: 61999
+    url: https://studio.genlayer.com/api
+    chain_type: studionet
+    # Non-deterministic transactions wait on live inference across validators,
+    # so the default poll budget is raised rather than left to time out mid-run.
+    default_wait_interval: 3000
+    default_wait_retries: 80
+
+  localnet:
+    id: 61999
+    url: http://127.0.0.1:4000/api
+    chain_type: localnet
+    default_wait_interval: 1000
+    default_wait_retries: 40
+
+paths:
+  contracts: contracts
+  artifacts: artifacts
+
+environment: .env
