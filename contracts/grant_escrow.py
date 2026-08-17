@@ -1135,6 +1135,18 @@ class Contract(gl.Contract):
             raise gl.vm.UserError("[EXPECTED] MILESTONE_NOT_FOUND")
         return self.milestones[key]
 
+    def _persist(self, grant: Grant, milestone: Milestone) -> None:
+        """Write mutated storage structs back into their maps.
+
+        A struct read out of a `TreeMap` is expected to be a write-through view,
+        so mutating it in place should already persist. Assigning it back is a
+        no-op when that holds and the difference between a working escrow and a
+        silently amnesiac one when it does not. Storage semantics are the last
+        place to rely on an expectation.
+        """
+        self.grants[grant.grant_id] = grant
+        self.milestones[self._milestone_key(grant.grant_id, int(milestone.index))] = milestone
+
     def _load_policy(self, policy_id: str) -> dict:
         """Read the frozen policy for a grant.
 
@@ -1271,6 +1283,7 @@ class Contract(gl.Contract):
         milestone.evidence_url = _validate_https_url(evidence_url, allow_empty=True)
         milestone.submitted_at = _now_iso()
         milestone.state = u8(MS_SUBMITTED)
+        self.milestones[self._milestone_key(grant_id, index)] = milestone
         return f"{grant_id}:{index}"
 
     @gl.public.write
@@ -1300,6 +1313,8 @@ class Contract(gl.Contract):
         refund = int(grant.escrowed)
         grant.escrowed = bigint(0)
         grant.status = u8(GRANT_CLOSED)
+        # Balance is zeroed and persisted before the transfer, never after.
+        self.grants[grant_id] = grant
         _send_value(grant.sponsor, refund)
         return u256(refund)
 
@@ -1378,6 +1393,7 @@ class Contract(gl.Contract):
             raise gl.vm.UserError("[EXPECTED] INVALID_APPEAL_BOND")
 
         milestone.appeal_bond = bigint(required_bond)
+        self.milestones[self._milestone_key(grant_id, index)] = milestone
         return self._run_review(
             grant=grant,
             milestone=milestone,
@@ -1697,6 +1713,7 @@ class Contract(gl.Contract):
         self.review_id_by_slot[f"{grant.grant_id}:{index}:{slot}"] = review_id
         milestone.review_count = u32(slot + 1)
         milestone.latest_review_id = review_id
+        self._persist(grant, milestone)
         return review_id
 
     # ------------------------------------------------------------------
