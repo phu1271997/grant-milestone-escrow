@@ -118,6 +118,7 @@ contracts/
   builder_reputation.py   escrow-bound track record
 frontend/                 Vite + React + genlayer-js
 tests/                    139 offline tests, plus the runtime shim they run on
+tests_onchain/            the same flow against real validators, via gltest
 scripts/                  policy bootstrap values, deployment verifier
 docs/                     problem, architecture, deploy runbook, demo script
 ```
@@ -140,8 +141,13 @@ a test instead of hiding behind a happy path.
 Against the real network:
 
 ```bash
-gltest --network studionet
+gltest --network studionet tests_onchain/
 ```
+
+The on-chain suite covers what the shim cannot: gas, finality, validator
+diversity, live inference and cross-contract messages passing through consensus.
+It needs a funded Studionet account. By definition it has never run offline, so
+run it once after deploying and before recording anything.
 
 ### Frontend
 
@@ -210,6 +216,19 @@ cd frontend && node ../scripts/verify-deployment.mjs <escrow> <policy> <reputati
   nothing.
 
 ---
+
+## Before submitting
+
+- [ ] Three contracts deployed to Studionet; every transaction shows
+      `Result: SUCCESS`, not merely `Status: FINALIZED`
+- [ ] `scripts/verify-deployment.mjs` passes every check
+- [ ] `gltest --network studionet tests_onchain/` has been run at least once
+- [ ] Frontend deployed with the three `VITE_` addresses set in the host's
+      environment, and rebuilt after setting them
+- [ ] Demo recorded with **two** funded wallets — sponsor and builder are
+      visibly different accounts
+- [ ] The links table at the top of this file is filled in
+- [ ] Nothing anywhere says "testnet". This is Studionet.
 
 ## Licence
 
