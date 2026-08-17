@@ -417,3 +417,147 @@ class Review:
     payout_bps: u32
     paid_amount: bigint
     created_at: str
+
+
+# ----------------------------------------------------------------------------
+# Review taxonomy
+# ----------------------------------------------------------------------------
+#
+# The jury never returns a verdict. It returns *observations*, and this module
+# turns observations into money by a fixed rule. That split is the whole point:
+# if the model chose the payout directly, two validators phrasing the same
+# judgment differently would produce two different payouts, and consensus would
+# either collapse or have to be weakened until it meant nothing.
+#
+# Observations come in two flavours:
+#
+#   * CODE_* keys are decided here, in Python, from fetched metadata. A release
+#     published before the grant existed is not a matter of opinion.
+#   * LLM_* keys are decided by the model reading the evidence.
+#
+# Both land in the same bitmask so that downstream logic — and the stored
+# record — treats them uniformly.
+
+CODE_BLOCKER_KEYS = [
+    # The tagged release predates the grant: the work is being re-submitted.
+    "release_predates_grant",
+    # The three GitHub views of this tag disagree about which commit it is.
+    "source_commit_conflict",
+    # The tag resolves, but not to a commit that exists in this repository.
+    "commit_not_in_repository",
+]
+
+LLM_BLOCKER_KEYS = [
+    # Evidence describes a different project than the funded repository.
+    "unrelated_repository",
+    # The submission does not engage with the acceptance criteria at all.
+    "criteria_not_addressed",
+    # The deliverable page asserts things the release contradicts.
+    "fabricated_evidence",
+    # A named artefact is simply absent from the tagged release.
+    "artifact_absent_from_release",
+]
+
+BLOCKER_KEYS = CODE_BLOCKER_KEYS + LLM_BLOCKER_KEYS
+
+CODE_GAP_KEYS = [
+    # A GitHub endpoint did not answer, or answered unusably.
+    "release_source_unreachable",
+    # The deliverable page did not render.
+    "evidence_page_unreachable",
+    # The model's JSON was malformed, fenced, or missing keys.
+    "llm_output_unusable",
+    # The model did not classify every requirement exactly once.
+    "requirement_coverage_incomplete",
+    # The model invented a requirement id.
+    "requirement_id_unknown",
+    # The model's own confidence fell under the policy floor.
+    "confidence_below_policy_floor",
+]
+
+LLM_GAP_KEYS = [
+    # Evidence exists but does not let anyone check the claim either way.
+    "deliverable_unverifiable",
+    # The acceptance criterion itself admits more than one reading.
+    "criteria_ambiguous",
+]
+
+GAP_KEYS = CODE_GAP_KEYS + LLM_GAP_KEYS
+
+MAX_BLOCKER_MASK = (1 << len(BLOCKER_KEYS)) - 1
+MAX_GAP_MASK = (1 << len(GAP_KEYS)) - 1
+
+# Only the LLM_* subsets are accepted from model output. If the model tries to
+# assert `release_predates_grant` it is claiming authority over a fact that was
+# already settled arithmetically, and the key is refused.
+LLM_ALLOWED_BLOCKERS = set(LLM_BLOCKER_KEYS)
+LLM_ALLOWED_GAPS = set(LLM_GAP_KEYS)
+
+
+def _bit(keys: list, name: str) -> int:
+    """Bit position of a taxonomy key within its mask."""
+    return 1 << keys.index(name)
+
+
+def _keys_to_mask(keys: list, allowed: set, selected: object, all_keys: list) -> int:
+    """Fold a list of taxonomy key strings into a bitmask.
+
+    Unknown or out-of-scope keys are a hard failure rather than a silent skip:
+    a model that emits a key this contract does not recognise has not been
+    understood, and guessing at its intent is how a review quietly becomes a
+    rubber stamp.
+    """
+    if not isinstance(selected, list):
+        raise ValueError("taxonomy selection must be a list")
+    mask = 0
+    for k in selected:
+        if not isinstance(k, str):
+            raise ValueError("taxonomy key must be a string")
+        if k not in allowed:
+            raise ValueError(f"taxonomy key out of scope: {k}")
+        mask |= _bit(all_keys, k)
+    return mask
+
+
+def _derive_settlement(
+    met_count: int,
+    total_count: int,
+    blocker_mask: int,
+    gap_mask: int,
+    substantial_permille: int,
+    partial_permille: int,
+    substantial_payout_bps: int,
+    partial_payout_bps: int,
+) -> tuple:
+    """Turn observations into (tier, payout_bps) by fixed precedence.
+
+    Precedence, highest first:
+
+      1. Any gap        -> NEEDS_CLARIFICATION. Nothing is paid and nothing is
+                           held against the builder; the submission is retried.
+      2. Any blocker    -> REJECTED. The evidence is disqualifying, not merely
+                           incomplete.
+      3. Completion band -> COMPLETE / SUBSTANTIAL / PARTIAL / INSUFFICIENT.
+
+    Gaps outrank blockers deliberately. "I could not read the evidence" must
+    never be allowed to harden into "the work is disqualified", because the
+    second is a permanent mark and the first is a network hiccup.
+
+    All arithmetic is integer. Floats are forbidden in contract signatures and
+    would in any case make two validators disagree over a rounding bit.
+    """
+    if gap_mask != 0:
+        return (TIER_NEEDS_CLARIFICATION, 0)
+    if blocker_mask != 0:
+        return (TIER_REJECTED, 0)
+    if total_count <= 0 or met_count < 0 or met_count > total_count:
+        return (TIER_NEEDS_CLARIFICATION, 0)
+
+    permille = (met_count * PERMILLE_DENOMINATOR) // total_count
+    if permille >= PERMILLE_DENOMINATOR:
+        return (TIER_COMPLETE, BPS_DENOMINATOR)
+    if permille >= substantial_permille:
+        return (TIER_SUBSTANTIAL, substantial_payout_bps)
+    if permille >= partial_permille:
+        return (TIER_PARTIAL, partial_payout_bps)
+    return (TIER_INSUFFICIENT, 0)
