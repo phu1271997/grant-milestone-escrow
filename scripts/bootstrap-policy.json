@@ -1,0 +1,51 @@
+{
+  "_comment": [
+    "Arguments for MilestonePolicy.publish_policy, in order.",
+    "Copy these into the Studio 'Run & Debug' method form after deploying the",
+    "policy contract. A published policy can never be edited, so read the values",
+    "before sending: a grant funded against this id is judged by exactly these",
+    "numbers for its whole life."
+  ],
+
+  "standard-v1": {
+    "policy_id": "standard-v1",
+    "label": "Standard milestone review",
+    "substantial_permille": 750,
+    "partial_permille": 500,
+    "substantial_payout_bps": 7500,
+    "partial_payout_bps": 5000,
+    "confidence_threshold": 70,
+    "appeal_bond_bps": 1000,
+    "min_appeal_bond": "1000000000000000",
+    "max_reviews_per_milestone": 4,
+
+    "_reads_as": [
+      "All requirements met -> 100% released.",
+      "75% or more met -> 75% released.",
+      "50% or more met -> 50% released.",
+      "Below 50% -> nothing released.",
+      "A jury less than 70% sure returns NEEDS_CLARIFICATION and releases nothing.",
+      "An appeal costs 10% of the milestone, with a floor of 0.001 GEN.",
+      "At most four review attempts per milestone."
+    ]
+  },
+
+  "strict-v1": {
+    "policy_id": "strict-v1",
+    "label": "Strict review for high-value milestones",
+    "substantial_permille": 900,
+    "partial_permille": 700,
+    "substantial_payout_bps": 8000,
+    "partial_payout_bps": 4000,
+    "confidence_threshold": 85,
+    "appeal_bond_bps": 500,
+    "min_appeal_bond": "1000000000000000",
+    "max_reviews_per_milestone": 3,
+
+    "_reads_as": [
+      "Demands 90% of requirements for a substantial payout and an 85% confident jury.",
+      "The appeal bond is deliberately cheaper than standard-v1: a stricter jury",
+      "should be easier, not harder, to question."
+    ]
+  }
+}
