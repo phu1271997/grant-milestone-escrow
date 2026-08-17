@@ -555,6 +555,10 @@ def call(instance, method_name: str, *args, sender: str = None, value: int = 0, 
         WORLD.sender = Address(sender)
     WORLD.value = int(value)
     if value:
+        # Attached value leaves the caller and lands in the contract, so a test
+        # can assert on a participant's net position rather than on gross flows.
+        if sender is not None:
+            WORLD.credit(sender, -int(value))
         WORLD.credit(getattr(instance, "__gl_address__", "0x" + "0" * 40), int(value))
     _CALL_STACK.append(getattr(instance, "__gl_address__", None))
     try:
