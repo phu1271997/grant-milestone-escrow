@@ -22,3 +22,6 @@ dist/
 
 # gltest build artifacts
 artifacts/
+
+# TypeScript incremental build info
+*.tsbuildinfo
