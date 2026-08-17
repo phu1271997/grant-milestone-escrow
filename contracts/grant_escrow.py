@@ -561,3 +561,231 @@ def _derive_settlement(
     if permille >= partial_permille:
         return (TIER_PARTIAL, partial_payout_bps)
     return (TIER_INSUFFICIENT, 0)
+
+
+# ----------------------------------------------------------------------------
+# Evidence collection (runs inside the non-deterministic block)
+# ----------------------------------------------------------------------------
+
+
+def _resp_status(resp: object) -> int:
+    """Read an HTTP status off a web response across SDK shapes.
+
+    Current builds expose `.status`; some expose `.status_code`. A response with
+    neither is treated as status 0, which every caller reads as a failure.
+    """
+    for attr in ("status", "status_code"):
+        value = getattr(resp, attr, None)
+        if isinstance(value, int):
+            return value
+    return 0
+
+
+def _resp_json(resp: object) -> object:
+    """Decode a JSON response body, or return None if it is not usable."""
+    body = getattr(resp, "body", None)
+    if body is None:
+        return None
+    try:
+        if isinstance(body, (bytes, bytearray)):
+            text = bytes(body).decode("utf-8")
+        elif isinstance(body, str):
+            text = body
+        else:
+            return None
+        return json.loads(text)
+    except Exception:
+        return None
+
+
+def _github_get(path: str) -> object:
+    """GET a GitHub REST endpoint and return the decoded JSON, or None.
+
+    The API version header is pinned so that a future default-version bump at
+    GitHub cannot silently change the shape of a field this contract reads.
+    """
+    resp = gl.nondet.web.get(
+        GITHUB_API_BASE + path,
+        headers={
+            "User-Agent": GITHUB_UA,
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    if _resp_status(resp) != 200:
+        return None
+    data = _resp_json(resp)
+    return data if isinstance(data, dict) else None
+
+
+def _resolve_tag_commit(repo: str, tag: str) -> str:
+    """Resolve a tag to the commit SHA it ultimately points at.
+
+    Annotated tags point at a tag object, which in turn points at the commit, so
+    one extra dereference is needed. Returns "" when the tag cannot be resolved.
+    """
+    ref = _github_get(f"{repo}/git/ref/tags/{tag}")
+    if ref is None:
+        return ""
+    obj = ref.get("object")
+    if not isinstance(obj, dict):
+        return ""
+
+    sha = obj.get("sha")
+    kind = obj.get("type")
+    if not isinstance(sha, str) or len(sha) != 40:
+        return ""
+
+    if kind == "commit":
+        return sha.lower()
+    if kind == "tag":
+        annotated = _github_get(f"{repo}/git/tags/{sha}")
+        if annotated is None:
+            return ""
+        inner = annotated.get("object")
+        if not isinstance(inner, dict):
+            return ""
+        inner_sha = inner.get("sha")
+        if isinstance(inner_sha, str) and len(inner_sha) == 40 and inner.get("type") == "commit":
+            return inner_sha.lower()
+    return ""
+
+
+def _collect_release_evidence(repo: str, tag: str, grant_created_at: str) -> dict:
+    """Gather and cross-check the release side of the evidence.
+
+    Three independent GitHub views of the same tag are consulted:
+
+      1. the Releases API  — when it was announced, and the release notes
+      2. the git ref API   — which object the tag actually names
+      3. the Commits API   — that the object is a commit *in this repository*
+
+    A single view would be enough to read a number off. Three are used because
+    the interesting failures are disagreements between them: a tag moved after
+    the announcement, or a release whose notes describe work that the commit
+    history does not contain. Any disagreement is a blocker rather than a
+    judgment call, and never reaches the model.
+    """
+    result = {
+        "ok": False,
+        "commit_sha": "",
+        "published_at": "",
+        "commit_date": "",
+        "release_notes": "",
+        "blocker_mask": 0,
+        "gap_mask": 0,
+    }
+
+    release = _github_get(f"{repo}/releases/tags/{tag}")
+    if release is None:
+        result["gap_mask"] = _bit(GAP_KEYS, "release_source_unreachable")
+        return result
+
+    # A draft release is not public evidence; anyone can un-draft it after the
+    # fact, so it is treated as absent rather than as a weaker signal.
+    if release.get("draft") is True:
+        result["gap_mask"] = _bit(GAP_KEYS, "release_source_unreachable")
+        return result
+
+    published_raw = release.get("published_at")
+    published_dt = _parse_iso_utc(published_raw)
+    if published_dt is None:
+        result["gap_mask"] = _bit(GAP_KEYS, "release_source_unreachable")
+        return result
+
+    notes = release.get("body")
+    notes_text = _collapse_whitespace(notes) if isinstance(notes, str) else ""
+
+    commit_sha = _resolve_tag_commit(repo, tag)
+    if commit_sha == "":
+        result["gap_mask"] = _bit(GAP_KEYS, "release_source_unreachable")
+        return result
+
+    commit = _github_get(f"{repo}/commits/{commit_sha}")
+    if commit is None:
+        # The tag names a SHA, but this repository does not contain it. That is
+        # a positive finding, not a missing one, so it blocks rather than gaps.
+        result["blocker_mask"] = _bit(BLOCKER_KEYS, "commit_not_in_repository")
+        result["commit_sha"] = commit_sha
+        result["published_at"] = published_raw
+        return result
+
+    returned_sha = commit.get("sha")
+    if not isinstance(returned_sha, str) or returned_sha.lower() != commit_sha:
+        result["blocker_mask"] = _bit(BLOCKER_KEYS, "source_commit_conflict")
+        result["commit_sha"] = commit_sha
+        result["published_at"] = published_raw
+        return result
+
+    commit_meta = commit.get("commit")
+    committer = commit_meta.get("committer") if isinstance(commit_meta, dict) else None
+    commit_dt = _parse_iso_utc(committer.get("date")) if isinstance(committer, dict) else None
+    if commit_dt is None:
+        result["gap_mask"] = _bit(GAP_KEYS, "release_source_unreachable")
+        result["commit_sha"] = commit_sha
+        return result
+
+    blockers = 0
+
+    # A tag whose commit is newer than the release announcement means the tag
+    # was moved after publication. The announcement no longer describes the code.
+    if commit_dt > published_dt:
+        blockers |= _bit(BLOCKER_KEYS, "source_commit_conflict")
+
+    # Work that was already released before the grant was funded is not work the
+    # grant paid for. This is arithmetic, so the model is never asked about it.
+    grant_dt = _parse_iso_utc(grant_created_at)
+    if grant_dt is not None and published_dt < grant_dt:
+        blockers |= _bit(BLOCKER_KEYS, "release_predates_grant")
+
+    result["ok"] = blockers == 0
+    result["commit_sha"] = commit_sha
+    result["published_at"] = published_raw
+    result["commit_date"] = committer.get("date")
+    result["release_notes"] = notes_text[:MAX_RELEASE_NOTES_CHARS]
+    result["blocker_mask"] = blockers
+    return result
+
+
+def _render_evidence_page(url: str) -> dict:
+    """Render the deliverable page to text.
+
+    Failure is a gap, never a blocker. A demo that is down during one review is
+    a reason to look again, not a reason to disqualify a builder.
+    """
+    if url == "":
+        return {"ok": True, "text": "", "gap_mask": 0}
+    try:
+        rendered = gl.nondet.web.render(url, mode="text", wait_after_loaded="5s")
+    except Exception:
+        return {"ok": False, "text": "", "gap_mask": _bit(GAP_KEYS, "evidence_page_unreachable")}
+
+    if not isinstance(rendered, str) or _collapse_whitespace(rendered) == "":
+        return {"ok": False, "text": "", "gap_mask": _bit(GAP_KEYS, "evidence_page_unreachable")}
+
+    return {
+        "ok": True,
+        "text": _collapse_whitespace(rendered)[:MAX_EVIDENCE_PAGE_CHARS],
+        "gap_mask": 0,
+    }
+
+
+def _evidence_fingerprint(repo: str, tag: str, commit_sha: str, published_at: str, evidence_url: str) -> str:
+    """Hash the *identity* of the evidence, never its rendered content.
+
+    Two validators rendering the same live page a second apart will see slightly
+    different bytes; hashing that text would make agreement impossible. What can
+    be pinned is which immutable objects were consulted, and that is what every
+    validator must reproduce exactly.
+    """
+    return _sha256_hex(
+        _canonical_json(
+            {
+                "repo": repo,
+                "tag": tag,
+                "commit_sha": commit_sha,
+                "published_at": published_at,
+                "evidence_url": evidence_url,
+            }
+        )
+    )
