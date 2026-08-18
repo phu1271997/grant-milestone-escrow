@@ -47,19 +47,45 @@ export function CreateGrant({ onCreated }: { onCreated: (grantId: string) => voi
     depositError = (caught as Error).message;
   }
 
-  const ready =
-    deposit !== null &&
-    deposit > 0n &&
-    grantee.trim() !== '' &&
-    repo.trim() !== '' &&
-    title.trim() !== '' &&
-    policyId !== '' &&
-    milestones.every(
-      (draft) =>
-        draft.title.trim() !== '' &&
-        draft.allocationGen.trim() !== '' &&
-        draft.criteria.filter((c) => c.trim().length >= 8).length >= 2,
+  /**
+   * What is still missing, stated plainly.
+   *
+   * A disabled button with no explanation is a dead end: the form looks
+   * complete, the deposit total is right there, and nothing says which field is
+   * holding it up. Every condition the contract enforces is listed here instead,
+   * so the answer is on screen rather than in a revert message.
+   */
+  const blockers: string[] = [];
+  if (title.trim() === '') blockers.push('Give the grant a title.');
+  if (repo.trim() === '') blockers.push('Name the GitHub repository, as owner/name.');
+  if (!/^0x[0-9a-fA-F]{40}$/.test(grantee.trim())) {
+    blockers.push('Enter the builder\'s address — 0x followed by 40 hex characters.');
+  }
+  if (policyId === '') {
+    blockers.push(
+      policies.length === 0
+        ? 'No review policy could be read from the policy contract. Publish one before funding a grant.'
+        : 'Choose a review policy.',
     );
+  }
+  milestones.forEach((draft, index) => {
+    const label = `Milestone ${index + 1}`;
+    if (draft.title.trim() === '') blockers.push(`${label}: add a title.`);
+    if (draft.allocationGen.trim() === '') blockers.push(`${label}: set an allocation in GEN.`);
+    const usable = draft.criteria.filter((c) => c.trim().length >= 8);
+    if (usable.length < 2) {
+      blockers.push(
+        `${label}: needs at least 2 acceptance criteria of 8 characters or more (${usable.length} so far).`,
+      );
+    }
+    const folded = usable.map((c) => c.trim().toLowerCase());
+    if (new Set(folded).size !== folded.length) {
+      blockers.push(`${label}: two criteria are the same. Each must be distinct.`);
+    }
+  });
+  if (deposit !== null && deposit === 0n) blockers.push('The total deposit cannot be zero.');
+
+  const ready = blockers.length === 0 && depositError === null && deposit !== null && deposit > 0n;
 
   async function submit() {
     setError(null);
@@ -228,6 +254,14 @@ export function CreateGrant({ onCreated }: { onCreated: (grantId: string) => voi
         <button className="primary" disabled={!ready || progress !== null} onClick={submit}>
           Fund grant
         </button>
+
+        {blockers.length > 0 && (
+          <ul className="blockers">
+            {blockers.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <ConsensusProgress progress={progress} />
