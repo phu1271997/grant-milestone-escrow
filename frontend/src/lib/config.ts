@@ -36,14 +36,28 @@ export const configured = escrowAddress.status === 'ok';
 export const chain = studionet;
 export const chainIdHex = `0x${studionet.id.toString(16)}` as const;
 
+/**
+ * Explorer base URL.
+ *
+ * Everything else about the chain is read from the SDK, but
+ * `studionet.blockExplorers` currently points at a host that answers 503. That
+ * would leave every "view on the explorer" link dead — the one place a
+ * sceptical reader goes to confirm any of this is real — so the working
+ * Studionet explorer is pinned here instead.
+ *
+ * Revert this to `studionet.blockExplorers.default.url` once that host is back.
+ */
+const EXPLORER_BASE = 'https://explorer-studio.genlayer.com';
+
+function explorerLink(kind: 'tx' | 'address', value?: string): string | null {
+  if (!EXPLORER_BASE || !value) return null;
+  return `${EXPLORER_BASE.replace(/\/$/, '')}/${kind}/${value}`;
+}
+
 export function explorerTx(hash?: string): string | null {
-  const base = studionet.blockExplorers?.default?.url;
-  if (!base || !hash) return null;
-  return `${base.replace(/\/$/, '')}/tx/${hash}`;
+  return explorerLink('tx', hash);
 }
 
 export function explorerAddress(address?: string): string | null {
-  const base = studionet.blockExplorers?.default?.url;
-  if (!base || !address) return null;
-  return `${base.replace(/\/$/, '')}/address/${address}`;
+  return explorerLink('address', address);
 }
