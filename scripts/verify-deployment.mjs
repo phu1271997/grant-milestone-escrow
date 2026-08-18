@@ -10,17 +10,35 @@
  * This reads all three contracts and checks the wiring is mutually consistent,
  * which is the thing a green deploy log does not tell you.
  *
- * Usage, from the frontend directory (it borrows the installed SDK):
+ * Usage, from anywhere in the repository:
  *
- *   cd frontend
- *   node ../scripts/verify-deployment.mjs <escrow> <policy> <reputation>
+ *   node scripts/verify-deployment.mjs <escrow> <policy> <reputation>
  *
  * Or with no arguments, reading frontend/.env.local.
  */
 
 import { readFileSync } from 'node:fs';
-import { createClient } from 'genlayer-js';
-import { studionet } from 'genlayer-js/chains';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+
+/**
+ * Node resolves bare imports relative to *this file*, not the working
+ * directory, so `genlayer-js` is invisible from scripts/ even when the frontend
+ * has it installed. Resolving through frontend/package.json borrows the SDK
+ * that the app itself is built against — which is also the version you want to
+ * be verifying with.
+ */
+const require = createRequire(new URL('../frontend/package.json', import.meta.url));
+let createClient;
+let studionet;
+try {
+  ({ createClient } = await import(pathToFileURL(require.resolve('genlayer-js')).href));
+  ({ studionet } = await import(pathToFileURL(require.resolve('genlayer-js/chains')).href));
+} catch (error) {
+  console.error('Could not load genlayer-js. Run `npm ci` in frontend/ first.');
+  console.error(error?.message ?? error);
+  process.exit(4);
+}
 
 const PASS = '  ok   ';
 const FAIL = ' FAIL  ';
