@@ -106,7 +106,7 @@ errors. The escrow just writes reputation records into the void, and you find
 out during the demo.
 
 ```bash
-cd frontend && node ../scripts/verify-deployment.mjs <escrow> <policy> <reputation>
+node scripts/verify-deployment.mjs <escrow> <policy> <reputation>
 ```
 
 Every check must pass before you go further.

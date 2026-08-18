@@ -18,12 +18,28 @@ Built on **GenLayer**, deployed on **GenLayer Studionet**.
 
 | | |
 |---|---|
-| Live app | _(fill in after deploying — see [docs/DEPLOY-STUDIONET.md](docs/DEPLOY-STUDIONET.md))_ |
-| Escrow contract | _(fill in)_ |
-| Policy contract | _(fill in)_ |
-| Reputation contract | _(fill in)_ |
+| Live app | https://grant-milestone-escrow.vercel.app |
+| Source | https://github.com/phu1271997/grant-milestone-escrow |
 | Network | GenLayer Studionet, chain id `61999` |
 | Demo video | _(fill in)_ |
+
+Deployed contracts:
+
+| Contract | Address |
+|---|---|
+| `GrantEscrow` | [`0xDbbFB57a5dB6657e0D3f6468D2682d93068DfBFC`](https://explorer-studio.genlayer.com/address/0xDbbFB57a5dB6657e0D3f6468D2682d93068DfBFC) |
+| `MilestonePolicy` | [`0x01E8f6317dFF5cdb93B565D60C17E3f638f81293`](https://explorer-studio.genlayer.com/address/0x01E8f6317dFF5cdb93B565D60C17E3f638f81293) |
+| `BuilderReputation` | [`0xfCAB129167881BBa3B5619A893Be4D0E85E4c122`](https://explorer-studio.genlayer.com/address/0xfCAB129167881BBa3B5619A893Be4D0E85E4c122) |
+
+Verify the wiring yourself, without a wallet:
+
+```bash
+cd frontend && npm ci && cd ..
+node scripts/verify-deployment.mjs \
+  0xDbbFB57a5dB6657e0D3f6468D2682d93068DfBFC \
+  0x01E8f6317dFF5cdb93B565D60C17E3f638f81293 \
+  0xfCAB129167881BBa3B5619A893Be4D0E85E4c122
+```
 
 ---
 
@@ -170,7 +186,7 @@ there — MetaMask signs every write.
 [docs/DEPLOY-STUDIONET.md](docs/DEPLOY-STUDIONET.md) — five ordered steps, then:
 
 ```bash
-cd frontend && node ../scripts/verify-deployment.mjs <escrow> <policy> <reputation>
+node scripts/verify-deployment.mjs <escrow> <policy> <reputation>
 ```
 
 ---
