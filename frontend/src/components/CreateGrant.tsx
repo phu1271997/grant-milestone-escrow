@@ -10,10 +10,26 @@ const BLANK: MilestoneDraft = {
   criteria: ['', ''],
 };
 
-export function CreateGrant({ onCreated }: { onCreated: (grantId: string) => void }) {
+interface CreateGrantProps {
+  account: `0x${string}` | null;
+  onCreated: (grantId: string) => void;
+}
+
+export function CreateGrant({ account, onCreated }: CreateGrantProps) {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [policyId, setPolicyId] = useState('');
   const [grantee, setGrantee] = useState('');
+  // Prefill the builder address with the connected wallet the first time it
+  // becomes known. Reviewers most often want to fund a demo grant to
+  // themselves so they can submit evidence on the next screen, and this saves
+  // a copy-paste while still allowing them to overwrite for a real grant.
+  const [granteeAutoFilled, setGranteeAutoFilled] = useState(false);
+  useEffect(() => {
+    if (account && !granteeAutoFilled && grantee === '') {
+      setGrantee(account);
+      setGranteeAutoFilled(true);
+    }
+  }, [account, grantee, granteeAutoFilled]);
   const [repo, setRepo] = useState('');
   const [title, setTitle] = useState('');
   const [durationDays, setDurationDays] = useState('180');
@@ -140,6 +156,18 @@ export function CreateGrant({ onCreated }: { onCreated: (grantId: string) => voi
           <label>
             Builder address
             <input value={grantee} onChange={(e) => setGrantee(e.target.value)} placeholder="0x…" />
+            {account && (
+              <button
+                type="button"
+                className="ghost inline"
+                onClick={() => setGrantee(account)}
+                disabled={grantee.toLowerCase() === account}
+              >
+                {grantee.toLowerCase() === account
+                  ? 'Using your connected wallet'
+                  : 'Use my connected wallet'}
+              </button>
+            )}
           </label>
           <label>
             Deadline (days)

@@ -207,6 +207,23 @@ button.ghost {
   border-style: dashed;
   color: var(--muted);
 }
+.ghost.inline,
+a.ghost.inline {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  color: var(--accent);
+  background: none;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ghost.inline:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 
 /* ---------------------------------------------------------------- inputs */
 

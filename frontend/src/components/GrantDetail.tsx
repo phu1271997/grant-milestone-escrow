@@ -65,7 +65,7 @@ export function GrantDetail({ grantId, account }: Props) {
       'You can close the grant once every milestone is settled or the deadline passes. Only the builder wallet can submit evidence.';
   } else {
     roleLabel = 'You are an observer';
-    roleHint = `Only the builder (${grant.grantee}) can submit milestone evidence. Anyone can convene the jury.`;
+    roleHint = `Only the builder (${grant.grantee}) can submit milestone evidence for this grant. To try submitting evidence end-to-end, fund a new grant with your own wallet as the builder — the "New grant" tab prefills your address for exactly this reason.`;
   }
 
   return (
@@ -128,6 +128,11 @@ export function GrantDetail({ grantId, account }: Props) {
       <section className={`role-banner ${isBuilder ? 'is-builder' : isSponsor ? 'is-sponsor' : 'is-observer'}`}>
         <strong>{roleLabel}</strong>
         <p className="small muted">{roleHint}</p>
+        {!isBuilder && !isSponsor && (
+          <a className="ghost inline" href="#/new">
+            Fund a grant to yourself →
+          </a>
+        )}
       </section>
 
       <section>

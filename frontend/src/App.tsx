@@ -107,7 +107,7 @@ export default function App() {
         ) : grantMatch ? (
           <GrantDetail grantId={grantMatch[1]} account={account} />
         ) : route.startsWith('#/new') ? (
-          <CreateGrant onCreated={() => navigate('#/')} />
+          <CreateGrant account={account} onCreated={() => navigate('#/')} />
         ) : (
           <>
             <section className="intro">
