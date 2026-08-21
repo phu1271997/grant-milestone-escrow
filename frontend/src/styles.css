@@ -280,6 +280,43 @@ fieldset input {
   align-items: center;
 }
 
+.role-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 0.85rem 1.1rem;
+  margin: 1rem 0 1.5rem;
+}
+.role-banner strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.role-banner p {
+  margin: 0;
+}
+.role-banner.is-builder {
+  border-left-color: var(--accent);
+}
+.role-banner.is-sponsor {
+  border-left-color: #4b8dfa;
+}
+.role-banner.is-observer {
+  border-left-color: #b0b4bd;
+}
+
+.role-hint {
+  background: var(--accent-soft);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+  word-break: break-all;
+}
+.role-hint code {
+  font-size: 0.85em;
+}
+
 .intro {
   margin-bottom: 2rem;
   max-width: 68ch;

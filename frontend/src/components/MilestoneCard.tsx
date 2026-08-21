@@ -29,7 +29,11 @@ export function MilestoneCard({ grant, milestone, account, onChanged }: Props) {
   const [quote, setQuote] = useState<AppealQuote | null>(null);
   const [progress, setProgress] = useState<WriteProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(state !== MilestoneState.Open);
+  // Auto-expand Open and Submitted milestones so the submit affordance is
+  // visible without a click. Final/Settled milestones default to expanded too —
+  // a reviewer scanning the page needs to see the verdict and history without
+  // hunting for a disclosure triangle. Collapse remains available on the head.
+  const [expanded, setExpanded] = useState(true);
 
   const [tag, setTag] = useState(milestone.release_tag);
   const [evidenceUrl, setEvidenceUrl] = useState(milestone.evidence_url);
@@ -99,13 +103,22 @@ export function MilestoneCard({ grant, milestone, account, onChanged }: Props) {
             </ol>
           </section>
 
-          {isGrantee && (state === MilestoneState.Open || state === MilestoneState.Submitted) && (
+          {(state === MilestoneState.Open || state === MilestoneState.Submitted) && (
             <section className="panel">
               <h4>Submit evidence</h4>
               <p className="small muted">
                 The release tag must exist in <code>{grant.repo}</code>. The deliverable page is
                 optional but gives the jury something to check the release notes against.
               </p>
+              {!isGrantee && (
+                <p className="small role-hint">
+                  {account === null
+                    ? 'Connect the builder wallet to submit.'
+                    : 'Only the builder wallet can submit. Switch MetaMask to '}
+                  <code>{grant.grantee}</code>
+                  {account !== null && ' to enable this form.'}
+                </p>
+              )}
               <div className="field-row">
                 <label>
                   Release tag
@@ -113,6 +126,7 @@ export function MilestoneCard({ grant, milestone, account, onChanged }: Props) {
                     value={tag}
                     onChange={(event) => setTag(event.target.value)}
                     placeholder="v0.2.0"
+                    disabled={!isGrantee}
                   />
                 </label>
                 <label>
@@ -121,12 +135,13 @@ export function MilestoneCard({ grant, milestone, account, onChanged }: Props) {
                     value={evidenceUrl}
                     onChange={(event) => setEvidenceUrl(event.target.value)}
                     placeholder="https://demo.example/app"
+                    disabled={!isGrantee}
                   />
                 </label>
               </div>
               <button
                 className="primary"
-                disabled={progress !== null || tag.trim() === ''}
+                disabled={!isGrantee || progress !== null || tag.trim() === ''}
                 onClick={() =>
                   run(() =>
                     submitMilestone({

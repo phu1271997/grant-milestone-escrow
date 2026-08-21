@@ -122,6 +122,11 @@ export default function App() {
                 Browsing is read-only and needs no wallet. Connect one only to fund, submit, review
                 or appeal.
               </p>
+              <p className="small muted">
+                To try it end-to-end: fund a grant with your own address as the builder, open the
+                grant, expand a milestone, and use <em>Submit evidence</em> to hand a release tag
+                to the jury.
+              </p>
             </section>
             <GrantList onOpen={(grantId) => navigate(`#/grant/${grantId}`)} />
           </>

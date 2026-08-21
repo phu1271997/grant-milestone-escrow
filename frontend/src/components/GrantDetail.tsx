@@ -43,8 +43,30 @@ export function GrantDetail({ grantId, account }: Props) {
   if (!grant) return null;
 
   const isSponsor = account !== null && account === grant.sponsor.toLowerCase();
+  const isBuilder = account !== null && account === grant.grantee.toLowerCase();
   const closed = grant.status === '1';
   const repoUrl = `https://github.com/${grant.repo}`;
+
+  let roleLabel: string;
+  let roleHint: string;
+  if (account === null) {
+    roleLabel = 'Not connected';
+    roleHint =
+      'Browsing is read-only. Connect the builder wallet to submit evidence, the sponsor wallet to close the grant, or any wallet to convene the jury and pay gas.';
+  } else if (isBuilder && isSponsor) {
+    roleLabel = 'You are the sponsor and the builder';
+    roleHint = 'You can fund, submit, review and close this grant.';
+  } else if (isBuilder) {
+    roleLabel = 'You are the builder';
+    roleHint = 'You can submit each milestone for review, and file one appeal per milestone.';
+  } else if (isSponsor) {
+    roleLabel = 'You are the sponsor';
+    roleHint =
+      'You can close the grant once every milestone is settled or the deadline passes. Only the builder wallet can submit evidence.';
+  } else {
+    roleLabel = 'You are an observer';
+    roleHint = `Only the builder (${grant.grantee}) can submit milestone evidence. Anyone can convene the jury.`;
+  }
 
   return (
     <div className="detail">
@@ -102,6 +124,11 @@ export function GrantDetail({ grantId, account }: Props) {
       </dl>
 
       {reputation && <ReputationCard reputation={reputation} />}
+
+      <section className={`role-banner ${isBuilder ? 'is-builder' : isSponsor ? 'is-sponsor' : 'is-observer'}`}>
+        <strong>{roleLabel}</strong>
+        <p className="small muted">{roleHint}</p>
+      </section>
 
       <section>
         <h3>Milestones</h3>
