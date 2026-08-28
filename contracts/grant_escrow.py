@@ -153,13 +153,36 @@ def _validate_text(raw: str, max_len: int, error_code: str, min_len: int = 1) ->
 def _validate_repo(raw: str) -> str:
     """Validate a GitHub `owner/name` slug.
 
-    The repository is the anchor of every evidence fetch, so it is constrained
-    to the exact shape GitHub accepts rather than being passed through as a free
-    URL fragment. This closes off path traversal into other API endpoints.
+    The repository is the anchor of every evidence fetch, so the accepted shape
+    is what GitHub itself will resolve rather than a free URL fragment; anything
+    that could redirect an API call is refused. Common paste sources — a
+    browser URL, a `git clone` line — are normalised down to the bare slug so a
+    sponsor pasting `https://github.com/acme/widget` gets the same grant as one
+    typing `acme/widget`. Subpaths (`tree/main`, `issues/…`) are still refused
+    because they point at something other than the repository root.
     """
     if not isinstance(raw, str):
         raise gl.vm.UserError("[EXPECTED] INVALID_REPO")
-    clean = raw.strip().strip("/")
+    clean = raw.strip()
+
+    lower = clean.lower()
+    for prefix in (
+        "https://github.com/",
+        "http://github.com/",
+        "www.github.com/",
+        "github.com/",
+    ):
+        if lower.startswith(prefix):
+            clean = clean[len(prefix):]
+            break
+    else:
+        if lower.startswith("git@github.com:"):
+            clean = clean[len("git@github.com:"):]
+
+    clean = clean.strip().strip("/")
+    if clean.lower().endswith(".git"):
+        clean = clean[:-4]
+
     if len(clean) < 3 or len(clean) > MAX_REPO_LEN:
         raise gl.vm.UserError("[EXPECTED] INVALID_REPO")
     parts = clean.split("/")

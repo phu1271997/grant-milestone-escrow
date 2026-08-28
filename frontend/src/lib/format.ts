@@ -37,6 +37,43 @@ export function formatGen(wei: bigint | string, maxFractionDigits = 4): string {
   return `${negative ? '-' : ''}${grouped}${shown ? `.${shown}` : ''}`;
 }
 
+/**
+ * Reduce a pasted GitHub reference to the bare `owner/name` slug.
+ *
+ * Judges kept hitting `INVALID_REPO` because the natural things to paste — a
+ * browser URL, a `git clone` line — did not match the shape the contract
+ * accepts. The contract has since been widened to normalise these itself, but
+ * the same normalisation runs in the browser so the sponsor can see the exact
+ * slug that will be stored before they sign, and so an older deployment still
+ * accepts the input.
+ *
+ * Anything that is not a repository root (a subpath like `/tree/main`, a
+ * different host) is returned unchanged so the contract can reject it with the
+ * proper error rather than silently rewriting it.
+ */
+export function normalizeRepo(raw: string): string {
+  let clean = raw.trim();
+  const lower = clean.toLowerCase();
+  const prefixes = [
+    'https://github.com/',
+    'http://github.com/',
+    'www.github.com/',
+    'github.com/',
+  ];
+  for (const prefix of prefixes) {
+    if (lower.startsWith(prefix)) {
+      clean = clean.slice(prefix.length);
+      break;
+    }
+  }
+  if (clean === raw.trim() && lower.startsWith('git@github.com:')) {
+    clean = clean.slice('git@github.com:'.length);
+  }
+  clean = clean.trim().replace(/\/+$/, '');
+  if (clean.toLowerCase().endsWith('.git')) clean = clean.slice(0, -4);
+  return clean;
+}
+
 export function shortAddress(address: string): string {
   if (!address || address.length < 12) return address;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;

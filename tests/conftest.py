@@ -172,7 +172,13 @@ class Scenario:
             sender=SPONSOR,
         )
 
-    def create_grant(self, allocations=(60_000, 40_000), criteria_count=3, policy_id="standard-v1"):
+    def create_grant(
+        self,
+        allocations=(60_000, 40_000),
+        criteria_count=3,
+        policy_id="standard-v1",
+        repo="acme/widget",
+    ):
         milestones = []
         for i, allocation in enumerate(allocations):
             milestones.append(
@@ -189,7 +195,7 @@ class Scenario:
             self.escrow,
             "create_grant",
             GRANTEE,
-            "acme/widget",
+            repo,
             "Widget platform grant",
             policy_id,
             json.dumps(milestones),

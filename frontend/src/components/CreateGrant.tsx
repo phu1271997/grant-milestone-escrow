@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createGrant, explainError, listPolicies, type WriteProgress } from '../lib/client';
-import { formatGen, parseGen } from '../lib/format';
+import { formatGen, normalizeRepo, parseGen } from '../lib/format';
 import type { MilestoneDraft, Policy } from '../lib/types';
 import { ConsensusProgress } from './ConsensusProgress';
+
+const REPO_SLUG_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
 const BLANK: MilestoneDraft = {
   title: '',
@@ -71,9 +73,18 @@ export function CreateGrant({ account, onCreated }: CreateGrantProps) {
    * holding it up. Every condition the contract enforces is listed here instead,
    * so the answer is on screen rather than in a revert message.
    */
+  const normalizedRepo = normalizeRepo(repo);
+  const repoLooksValid = REPO_SLUG_RE.test(normalizedRepo);
+
   const blockers: string[] = [];
   if (title.trim() === '') blockers.push('Give the grant a title.');
-  if (repo.trim() === '') blockers.push('Name the GitHub repository, as owner/name.');
+  if (repo.trim() === '') {
+    blockers.push('Name the GitHub repository, as owner/name.');
+  } else if (!repoLooksValid) {
+    blockers.push(
+      `Repository must be a GitHub owner/name (paste the URL or type the slug). "${normalizedRepo || repo.trim()}" is not one.`,
+    );
+  }
   if (!/^0x[0-9a-fA-F]{40}$/.test(grantee.trim())) {
     blockers.push('Enter the builder\'s address — 0x followed by 40 hex characters.');
   }
@@ -114,7 +125,7 @@ export function CreateGrant({ account, onCreated }: CreateGrantProps) {
 
       const hash = await createGrant({
         grantee: grantee.trim(),
-        repo: repo.trim(),
+        repo: normalizedRepo,
         title: title.trim(),
         policyId,
         milestonesJson: JSON.stringify(payload),
@@ -149,7 +160,18 @@ export function CreateGrant({ account, onCreated }: CreateGrantProps) {
           </label>
           <label>
             GitHub repository
-            <input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="acme/widget" />
+            <input
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              placeholder="acme/widget or https://github.com/acme/widget"
+            />
+            {repo.trim() !== '' && (
+              <span className={`small ${repoLooksValid ? 'muted' : 'error'}`}>
+                {repoLooksValid
+                  ? `Will be stored as ${normalizedRepo}`
+                  : 'A GitHub URL, an owner/name slug, or a git@github.com clone URL.'}
+              </span>
+            )}
           </label>
         </div>
         <div className="field-row">

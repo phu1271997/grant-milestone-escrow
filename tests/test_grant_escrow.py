@@ -140,6 +140,54 @@ def test_malformed_repositories_are_refused(scenario, repo):
     assert "INVALID_REPO" in code(excinfo)
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "acme/widget",
+        "https://github.com/acme/widget",
+        "http://github.com/acme/widget",
+        "https://github.com/acme/widget/",
+        "https://github.com/acme/widget.git",
+        "github.com/acme/widget",
+        "www.github.com/acme/widget",
+        "git@github.com:acme/widget.git",
+        "  acme/widget  ",
+    ],
+)
+def test_common_repository_paste_shapes_are_normalised(scenario, raw):
+    """A sponsor pasting a GitHub URL gets the same grant as one typing the slug.
+
+    Judges kept hitting INVALID_REPO because the form accepted anything and the
+    contract only accepted the bare slug. Every canonical paste source now
+    normalises to `acme/widget` before storage.
+    """
+    grant_id = scenario.create_grant(repo=raw)
+    grant = scenario.grant(grant_id)
+    assert grant["repo"] == "acme/widget"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "https://github.com/acme/widget/tree/main",
+        "https://github.com/acme/widget/issues/1",
+        "https://gitlab.com/acme/widget",
+        "https://github.com/",
+    ],
+)
+def test_subpaths_and_non_github_hosts_still_refused(scenario, raw):
+    """Normalisation must not let a subpath or a different host slip through."""
+    milestones = json.dumps(
+        [{"title": "M1", "allocation": "10", "criteria": ["Ship the thing properly.", "Test it."]}]
+    )
+    with pytest.raises(UserError) as excinfo:
+        glstub.call(
+            scenario.escrow, "create_grant", GRANTEE, raw, "Grant", "standard-v1",
+            milestones, 90, sender=SPONSOR, value=10,
+        )
+    assert "INVALID_REPO" in code(excinfo)
+
+
 # ---------------------------------------------------------------------------
 # Submission
 # ---------------------------------------------------------------------------
