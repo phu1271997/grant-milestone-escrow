@@ -23,9 +23,35 @@ export function readAddress(raw: string | undefined): AddressState {
   return { status: 'ok', address: clean as `0x${string}` };
 }
 
-export const escrowAddress = readAddress(import.meta.env.VITE_ESCROW_ADDRESS);
-export const policyAddress = readAddress(import.meta.env.VITE_POLICY_ADDRESS);
-export const reputationAddress = readAddress(import.meta.env.VITE_REPUTATION_ADDRESS);
+/**
+ * Default contract addresses for the current Studionet deployment.
+ *
+ * Public addresses are not secrets, and hard-coding them as the default means a
+ * new checkout builds against the right contracts even before the Vercel
+ * dashboard's environment variables have been updated. A `VITE_` override still
+ * wins when it is set, so a local `.env.local` or a Vercel env change points the
+ * app at a different deployment without a code change.
+ */
+const DEFAULT_ESCROW = '0x9A4c7fbf8A24c2A17d448c43DD9B123E11567F8a';
+const DEFAULT_POLICY = '0xda275c8b345577Bc41a7e4C2490d04326762d5cB';
+const DEFAULT_REPUTATION = '0xe9B2783083c0bcA450a998b8c641B591638e8916';
+
+function firstNonEmpty(...values: (string | undefined)[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim() !== '') return value;
+  }
+  return undefined;
+}
+
+export const escrowAddress = readAddress(
+  firstNonEmpty(import.meta.env.VITE_ESCROW_ADDRESS, DEFAULT_ESCROW),
+);
+export const policyAddress = readAddress(
+  firstNonEmpty(import.meta.env.VITE_POLICY_ADDRESS, DEFAULT_POLICY),
+);
+export const reputationAddress = readAddress(
+  firstNonEmpty(import.meta.env.VITE_REPUTATION_ADDRESS, DEFAULT_REPUTATION),
+);
 
 export const configured = escrowAddress.status === 'ok';
 
