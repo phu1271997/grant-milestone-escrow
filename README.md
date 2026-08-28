@@ -27,18 +27,18 @@ Deployed contracts:
 
 | Contract | Address |
 |---|---|
-| `GrantEscrow` | [`0xDbbFB57a5dB6657e0D3f6468D2682d93068DfBFC`](https://explorer-studio.genlayer.com/address/0xDbbFB57a5dB6657e0D3f6468D2682d93068DfBFC) |
-| `MilestonePolicy` | [`0x01E8f6317dFF5cdb93B565D60C17E3f638f81293`](https://explorer-studio.genlayer.com/address/0x01E8f6317dFF5cdb93B565D60C17E3f638f81293) |
-| `BuilderReputation` | [`0xfCAB129167881BBa3B5619A893Be4D0E85E4c122`](https://explorer-studio.genlayer.com/address/0xfCAB129167881BBa3B5619A893Be4D0E85E4c122) |
+| `GrantEscrow` | [`0x9A4c7fbf8A24c2A17d448c43DD9B123E11567F8a`](https://explorer-studio.genlayer.com/address/0x9A4c7fbf8A24c2A17d448c43DD9B123E11567F8a) |
+| `MilestonePolicy` | [`0xda275c8b345577Bc41a7e4C2490d04326762d5cB`](https://explorer-studio.genlayer.com/address/0xda275c8b345577Bc41a7e4C2490d04326762d5cB) |
+| `BuilderReputation` | [`0xe9B2783083c0bcA450a998b8c641B591638e8916`](https://explorer-studio.genlayer.com/address/0xe9B2783083c0bcA450a998b8c641B591638e8916) |
 
 Verify the wiring yourself, without a wallet:
 
 ```bash
 cd frontend && npm ci && cd ..
 node scripts/verify-deployment.mjs \
-  0xDbbFB57a5dB6657e0D3f6468D2682d93068DfBFC \
-  0x01E8f6317dFF5cdb93B565D60C17E3f638f81293 \
-  0xfCAB129167881BBa3B5619A893Be4D0E85E4c122
+  0x9A4c7fbf8A24c2A17d448c43DD9B123E11567F8a \
+  0xda275c8b345577Bc41a7e4C2490d04326762d5cB \
+  0xe9B2783083c0bcA450a998b8c641B591638e8916
 ```
 
 ---
