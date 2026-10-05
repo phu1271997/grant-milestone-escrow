@@ -64,7 +64,7 @@ const GRANT = {
   title: 'GrantMilestoneEscrow reference build',
   policyId: 'standard-v1',
   durationDays: 180,
-  deliverableUrl: 'https://grant-milestone-escrow.vercel.app',
+  deliverableUrl: 'https://grant-milestone-escrow-nu.vercel.app',
   milestones: [
     {
       title: 'Ship the escrow, the app, and the test suite',

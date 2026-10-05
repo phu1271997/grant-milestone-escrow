@@ -18,7 +18,7 @@ Built on **GenLayer**, deployed on **GenLayer Studionet**.
 
 | | |
 |---|---|
-| Live app | https://grant-milestone-escrow.vercel.app |
+| Live app | https://grant-milestone-escrow-nu.vercel.app |
 | Source | https://github.com/phu1271997/grant-milestone-escrow |
 | Network | GenLayer Studionet, chain id `61999` |
 | Demo video | _(fill in)_ |
