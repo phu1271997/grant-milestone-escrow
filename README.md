@@ -27,18 +27,18 @@ Deployed contracts:
 
 | Contract | Address |
 |---|---|
-| `GrantEscrow` | [`0x9A4c7fbf8A24c2A17d448c43DD9B123E11567F8a`](https://explorer-studio.genlayer.com/address/0x9A4c7fbf8A24c2A17d448c43DD9B123E11567F8a) |
-| `MilestonePolicy` | [`0xda275c8b345577Bc41a7e4C2490d04326762d5cB`](https://explorer-studio.genlayer.com/address/0xda275c8b345577Bc41a7e4C2490d04326762d5cB) |
-| `BuilderReputation` | [`0xe9B2783083c0bcA450a998b8c641B591638e8916`](https://explorer-studio.genlayer.com/address/0xe9B2783083c0bcA450a998b8c641B591638e8916) |
+| `GrantEscrow` | [`0x57c7fA920F4407d084E47ED5E05fCfc7d56D9e00`](https://explorer-studio.genlayer.com/address/0x57c7fA920F4407d084E47ED5E05fCfc7d56D9e00) |
+| `MilestonePolicy` | [`0xb757eC8a9824Eb956072d7E6Bc5D5bC4ad597CAb`](https://explorer-studio.genlayer.com/address/0xb757eC8a9824Eb956072d7E6Bc5D5bC4ad597CAb) |
+| `BuilderReputation` | [`0xea3DDF603bBDFDcdEA1a9F92FCeE95c42C3daC26`](https://explorer-studio.genlayer.com/address/0xea3DDF603bBDFDcdEA1a9F92FCeE95c42C3daC26) |
 
 Verify the wiring yourself, without a wallet:
 
 ```bash
 cd frontend && npm ci && cd ..
 node scripts/verify-deployment.mjs \
-  0x9A4c7fbf8A24c2A17d448c43DD9B123E11567F8a \
-  0xda275c8b345577Bc41a7e4C2490d04326762d5cB \
-  0xe9B2783083c0bcA450a998b8c641B591638e8916
+  0x57c7fA920F4407d084E47ED5E05fCfc7d56D9e00 \
+  0xb757eC8a9824Eb956072d7E6Bc5D5bC4ad597CAb \
+  0xea3DDF603bBDFDcdEA1a9F92FCeE95c42C3daC26
 ```
 
 ---
@@ -78,7 +78,11 @@ Full write-up: [docs/PROBLEM.md](docs/PROBLEM.md).
 4. **The contract turns observations into a payout tier** by a fixed rule the
    model never sees. Money moves only if validators agree on that tier *and* on
    which commit they read.
-5. **The builder can appeal** by posting a bond, once per milestone.
+5. **The builder can appeal** by posting a bond, once per milestone. A milestone
+   settled below `COMPLETE` opens a **14-day appeal window**, and the sponsor
+   cannot close the grant — or reclaim the escrow the appeal would be paid from —
+   while that window is open. Closing is only possible once every milestone is
+   final (appealed or past its window) or the grant deadline has passed.
 
 Outcomes: `COMPLETE` · `SUBSTANTIAL` · `PARTIAL` · `INSUFFICIENT` · `REJECTED` ·
 `NEEDS_CLARIFICATION`.

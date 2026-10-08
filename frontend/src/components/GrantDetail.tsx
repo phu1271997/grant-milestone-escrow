@@ -62,7 +62,7 @@ export function GrantDetail({ grantId, account }: Props) {
   } else if (isSponsor) {
     roleLabel = 'You are the sponsor';
     roleHint =
-      'You can close the grant once every milestone is settled or the deadline passes. Only the builder wallet can submit evidence.';
+      'You can close the grant once every milestone is final — appealed or past its appeal window — or the deadline passes. Only the builder wallet can submit evidence.';
   } else {
     roleLabel = 'You are an observer';
     roleHint = `Only the builder (${grant.grantee}) can submit milestone evidence for this grant. To try submitting evidence end-to-end, fund a new grant with your own wallet as the builder — the "New grant" tab prefills your address for exactly this reason.`;
@@ -152,9 +152,10 @@ export function GrantDetail({ grantId, account }: Props) {
         <section className="panel">
           <h4>Close the grant</h4>
           <p className="small muted">
-            Returns whatever is still escrowed. Available once every milestone has reached a
-            terminal state, or once the deadline has passed — so a builder who never submits
-            cannot strand your deposit indefinitely.
+            Returns whatever is still escrowed. Available once every milestone is final — either
+            appealed or past its appeal window — or once the deadline has passed. A settled
+            milestone cannot be closed out from under an open appeal, and a builder who never
+            submits cannot strand your deposit indefinitely.
           </p>
           <button
             disabled={progress !== null}

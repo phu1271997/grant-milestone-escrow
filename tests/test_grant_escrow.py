@@ -451,6 +451,30 @@ def test_closing_is_blocked_while_milestones_are_live(scenario):
     assert "GRANT_STILL_OPEN" in code(excinfo)
 
 
+def test_closing_cannot_strand_an_open_appeal(scenario):
+    """Regression: a sponsor must not close while a milestone is still appealable.
+
+    A PARTIAL settlement leaves the milestone in MS_SETTLED with its appeal
+    window open. Closing there used to flip the grant inactive and refund the
+    escrow, so the builder's later appeal died on GRANT_NOT_ACTIVE. The close is
+    now refused, and the appeal still lands.
+    """
+    grant_id = scenario.create_grant()
+    for index in (0, 1):
+        scenario.submit(grant_id, index=index)
+        scenario.llm.reply = answer(["R1", "R2"])  # PARTIAL on both, appealable
+        scenario.review(grant_id, index=index)
+
+    with pytest.raises(UserError) as excinfo:
+        glstub.call(scenario.escrow, "close_grant", grant_id, sender=SPONSOR)
+    assert "GRANT_STILL_OPEN" in code(excinfo)
+
+    # The grant is still active, so the builder's appeal works.
+    scenario.llm.reply = answer(["R1", "R2", "R3"])
+    scenario.appeal(grant_id, 0, "R3 shipped in the same release; please re-check.", bond=6_000)
+    assert scenario.milestone(grant_id, 0)["settled_tier"] == "COMPLETE"
+
+
 def test_closing_returns_the_unspent_remainder(scenario):
     grant_id = scenario.create_grant()
     for index in (0, 1):
@@ -458,11 +482,21 @@ def test_closing_returns_the_unspent_remainder(scenario):
         scenario.llm.reply = answer(["R1", "R2"])  # PARTIAL on both
         scenario.review(grant_id, index=index)
 
+    # Consume each appeal so every milestone reaches MS_FINAL and the remainder
+    # is genuinely closeable. The appeals fail (unchanged reading), so each bond
+    # is forfeited back into the escrow rather than paid out.
+    for index, bond in ((0, 6_000), (1, 4_000)):
+        scenario.llm.reply = answer(["R1", "R2"])
+        scenario.appeal(grant_id, index, "Please reconsider the third requirement once more.", bond=bond)
+
     refund = glstub.call(scenario.escrow, "close_grant", grant_id, sender=SPONSOR)
 
-    assert int(refund) == 50_000  # half of each allocation went unpaid
-    # Net position: deposited 100000, got 50000 back, so 50000 actually spent.
-    assert scenario.world.balance_of(SPONSOR) == -50_000
+    # 50000 went unpaid; the two forfeited bonds (6000 + 4000) fell back in too.
+    assert int(refund) == 60_000
+    # Sponsor deposited 100000 and got 60000 back, so is out the 40000 paid out.
+    # The forfeited bonds came from the builder, netting the builder +40000.
+    assert scenario.world.balance_of(SPONSOR) == -40_000
+    assert scenario.world.balance_of(GRANTEE) == 40_000
     assert scenario.grant(grant_id)["status"] == "1"
     assert scenario.world.balance_of(scenario.escrow.__gl_address__) == 0
 

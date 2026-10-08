@@ -32,9 +32,9 @@ export function readAddress(raw: string | undefined): AddressState {
  * wins when it is set, so a local `.env.local` or a Vercel env change points the
  * app at a different deployment without a code change.
  */
-const DEFAULT_ESCROW = '0x9A4c7fbf8A24c2A17d448c43DD9B123E11567F8a';
-const DEFAULT_POLICY = '0xda275c8b345577Bc41a7e4C2490d04326762d5cB';
-const DEFAULT_REPUTATION = '0xe9B2783083c0bcA450a998b8c641B591638e8916';
+const DEFAULT_ESCROW = '0x57c7fA920F4407d084E47ED5E05fCfc7d56D9e00';
+const DEFAULT_POLICY = '0xb757eC8a9824Eb956072d7E6Bc5D5bC4ad597CAb';
+const DEFAULT_REPUTATION = '0xea3DDF603bBDFDcdEA1a9F92FCeE95c42C3daC26';
 
 function firstNonEmpty(...values: (string | undefined)[]): string | undefined {
   for (const value of values) {

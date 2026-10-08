@@ -58,6 +58,7 @@ export interface Milestone {
   paid_amount: string;
   appeal_filed: boolean;
   appeal_bond: string;
+  appeal_deadline_at: string;
 }
 
 export interface Review {
@@ -120,6 +121,7 @@ export interface AppealQuote {
   appealable: boolean;
   current_tier: Tier | '';
   current_payout_bps: string;
+  appeal_deadline_at: string;
 }
 
 export interface Page<T> {

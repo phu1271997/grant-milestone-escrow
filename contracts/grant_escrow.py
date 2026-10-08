@@ -54,6 +54,14 @@ ZERO_ADDRESS = "0x" + "0" * 40
 GRANT_ACTIVE = 0
 GRANT_CLOSED = 1
 
+# A milestone that settles below COMPLETE lands in MS_SETTLED, where the builder
+# may still appeal. That appeal right stays open for this window after the
+# settlement. The sponsor cannot close the grant — and so cannot reclaim the
+# escrow a successful appeal would be paid from — while any milestone's window is
+# still open. Without this, a sponsor could close the instant a milestone settled
+# PARTIAL, flip the grant inactive, and make every later file_appeal fail.
+APPEAL_WINDOW_DAYS = 14
+
 # Milestone state machine:
 #   OPEN      -> SUBMITTED   (grantee submits evidence)
 #   SUBMITTED -> SETTLED     (review reached a tier and paid)
@@ -410,6 +418,7 @@ class Milestone:
     paid_amount: bigint
     appeal_filed: bool
     appeal_bond: bigint
+    appeal_deadline_at: str
 
 
 @allow_storage
@@ -1278,6 +1287,7 @@ class Contract(gl.Contract):
                 paid_amount=bigint(0),
                 appeal_filed=False,
                 appeal_bond=bigint(0),
+                appeal_deadline_at="",
             )
 
         return grant_id
@@ -1313,9 +1323,22 @@ class Contract(gl.Contract):
     def close_grant(self, grant_id: str) -> u256:
         """Return the unspent balance to the sponsor and close the grant.
 
-        Allowed once every milestone has reached a terminal state, or once the
-        deadline has passed. The deadline exists so that a grantee who simply
-        never submits cannot strand the sponsor's money forever.
+        A milestone may be in one of three non-trivial states when the sponsor
+        reaches for the remainder:
+
+          * MS_FINAL   — nothing left to argue about. Always closeable.
+          * MS_SETTLED — settled below COMPLETE, so the builder may still appeal.
+                         This is *not* terminal: closing here would flip the
+                         grant inactive and make every later file_appeal fail,
+                         with the escrow the appeal would be paid from already
+                         refunded. It becomes closeable only once its appeal
+                         window (APPEAL_WINDOW_DAYS from settlement) has elapsed.
+          * OPEN / SUBMITTED — still live. Closeable only once the grant deadline
+                         has passed, so a grantee who never submits cannot strand
+                         the sponsor's money forever.
+
+        The appeal window is deliberately independent of the grant deadline: a
+        milestone settled on the last day still gets its full window to appeal.
         """
         grant = self._require_grant(grant_id)
         if _addr_str(gl.message.sender_address) != grant.sponsor:
@@ -1323,15 +1346,19 @@ class Contract(gl.Contract):
         if int(grant.status) != GRANT_ACTIVE:
             raise gl.vm.UserError("[EXPECTED] GRANT_NOT_ACTIVE")
 
-        all_terminal = True
+        deadline_past = _iso_is_past(grant.deadline_at)
         for i in range(int(grant.milestone_count)):
-            state = int(self._require_milestone(grant_id, i).state)
-            if state not in (MS_SETTLED, MS_FINAL):
-                all_terminal = False
-                break
-
-        if not all_terminal and not _iso_is_past(grant.deadline_at):
-            raise gl.vm.UserError("[EXPECTED] GRANT_STILL_OPEN")
+            milestone = self._require_milestone(grant_id, i)
+            state = int(milestone.state)
+            if state == MS_FINAL:
+                continue
+            if state == MS_SETTLED:
+                # An open appeal window keeps the milestone — and the escrow it
+                # might still pay out — off limits to the sponsor.
+                if not _iso_is_past(milestone.appeal_deadline_at):
+                    raise gl.vm.UserError("[EXPECTED] GRANT_STILL_OPEN")
+            elif not deadline_past:
+                raise gl.vm.UserError("[EXPECTED] GRANT_STILL_OPEN")
 
         refund = int(grant.escrowed)
         grant.escrowed = bigint(0)
@@ -1645,8 +1672,14 @@ class Contract(gl.Contract):
             milestone.settled_tier = tier
             milestone.settled_payout_bps = u32(payout_bps)
             milestone.paid_amount = bigint(paid_now)
-            # A full payout leaves nothing to argue about, so it is terminal.
-            milestone.state = u8(MS_FINAL if tier == TIER_COMPLETE else MS_SETTLED)
+            # A full payout leaves nothing to argue about, so it is terminal. Any
+            # lower tier is appealable, and opens a window during which the
+            # sponsor cannot close the grant out from under that appeal.
+            if tier == TIER_COMPLETE:
+                milestone.state = u8(MS_FINAL)
+            else:
+                milestone.state = u8(MS_SETTLED)
+                milestone.appeal_deadline_at = _iso_plus_days(_now_iso(), APPEAL_WINDOW_DAYS)
 
             _send_value(grant.grantee, paid_now)
             self._note_settlement(grant.grantee, tier, paid_now)
@@ -1873,6 +1906,7 @@ class Contract(gl.Contract):
                 "appealable": appealable,
                 "current_tier": milestone.settled_tier,
                 "current_payout_bps": str(int(milestone.settled_payout_bps)),
+                "appeal_deadline_at": milestone.appeal_deadline_at,
             }
         )
 
@@ -2004,6 +2038,7 @@ def _milestone_to_dict(m: Milestone) -> dict:
         "paid_amount": str(int(m.paid_amount)),
         "appeal_filed": m.appeal_filed,
         "appeal_bond": str(int(m.appeal_bond)),
+        "appeal_deadline_at": m.appeal_deadline_at,
     }
 
 

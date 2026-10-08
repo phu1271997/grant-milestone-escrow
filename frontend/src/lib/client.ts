@@ -305,7 +305,7 @@ const ERROR_COPY: Record<string, string> = {
   INVALID_APPEAL_BOND: 'The appeal bond must match the quoted amount exactly.',
   INVALID_REBUTTAL: 'The response needs to be at least a sentence.',
   REVIEW_LIMIT_REACHED: 'This milestone has used every review attempt its policy allows.',
-  GRANT_STILL_OPEN: 'Milestones are still live and the deadline has not passed.',
+  GRANT_STILL_OPEN: 'A milestone is still live or within its appeal window, and the deadline has not passed.',
   GRANT_NOT_ACTIVE: 'This grant is closed.',
   INVALID_EVIDENCE_URL: 'The evidence URL must be a public HTTPS address.',
   INVALID_RELEASE_TAG: 'That release tag contains characters this contract will not accept.',
